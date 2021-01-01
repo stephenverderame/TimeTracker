@@ -20,42 +20,41 @@ struct Record {
 #pragma pack(pop)
 
 constexpr auto record_size = static_cast<std::make_signed_t<decltype(sizeof(Record))>>(sizeof(Record));
-
-void addRecord(StreamMetadata& stream, RecordType type)
+inline auto streamSize(std::istream& str)
 {
-	if (stream.getWrite().good()) {
-		const auto currentTime = now();
-		Record r;
-		r.recordType = RecordType::end;
-		auto& in = stream.getRead();
-		auto& out = stream.getWrite();
-		in.seekg(0, std::ios::end);
-		if (in.tellg() >= record_size) {
-			in.seekg(-record_size, std::ios::end);
-			in.read(reinterpret_cast<char*>(&r), sizeof(r));
-		}
-		if (r.recordType != type) {
-			out.seekp(0, std::ios::end);
-			out.write(reinterpret_cast<const char*>(&currentTime), sizeof(currentTime));
-			out.write(reinterpret_cast<const char*>(&type), sizeof(type));
-
-			in.seekg(-record_size, std::ios::end);
-			in.read(reinterpret_cast<char*>(&r), sizeof(r));
-			if(r.recordType != type || r.t != currentTime) throw std::runtime_error("Bad read write");
-		}
+	str.seekg(0, std::ios::beg);
+	auto first = str.tellg();
+	str.seekg(0, std::ios::end);
+	return str.tellg() - first;;
+}
+Timestamp addRecord(std::shared_ptr<StreamWrapper> stream, RecordType type)
+{
+	const auto currentTime = now();
+	Record r;
+	r.recordType = RecordType::end;
+	auto& in = stream->getRead();
+	if (!in.bad() && streamSize(in) >= sizeof(Record)) {
+		in.seekg(-record_size, std::ios::end);
+		in.read(reinterpret_cast<char*>(&r), record_size);
 	}
-	else throw std::runtime_error("Cannot open file");
+	if (r.recordType != type) {
+		auto& out = stream->getWrite();
+		out.seekp(0, std::ios::end);
+		out.write(reinterpret_cast<const char*>(&currentTime), sizeof(currentTime));
+		out.write(reinterpret_cast<const char*>(&type), sizeof(type));
+	}
+	return currentTime;
 }
 
-void StreamLogger::logBegin(const char* task)
+Timestamp StreamLogger::logBegin(const char* task)
 {
 
-	addRecord(streams->getStream(task), RecordType::start);
+	return addRecord(streams->getStream(task), RecordType::start);
 }
 
-void StreamLogger::logEnd(const char* task)
+Timestamp StreamLogger::logEnd(const char* task)
 {
-	addRecord(streams->getStream(task), RecordType::end);
+	return addRecord(streams->getStream(task), RecordType::end);
 }
 /// @return the starting position of the record at the given index
 inline auto indexToAbsolutePosition(decltype(record_size) index)
@@ -67,36 +66,36 @@ inline auto indexToAbsolutePosition(decltype(record_size) index)
  * @return the timestamp of the record at the index
  * Requires recordIndex be valid
  */
-Record recordAt(ReaderStream& f, std::remove_cv_t<decltype(record_size)> recordIndex)
+Record recordAt(std::shared_ptr<ReaderStream> f, std::remove_cv_t<decltype(record_size)> recordIndex)
 {
-	f.getRead().seekg(indexToAbsolutePosition(recordIndex));
 	Record ret;
-	f.getRead().read(reinterpret_cast<char*>(&ret), sizeof(ret));
+	f->getRead().seekg(indexToAbsolutePosition(recordIndex));
+	f->getRead().read(reinterpret_cast<char*>(&ret), record_size);
 	return ret;
 }
+/// Requires file to be readable
 /// @return the amount of filesystem logger records in the file
 /// @throw runtime_error if file is corrupted or incorrect format
-auto recordCount(ReaderStream& f)
+auto recordCount(std::shared_ptr<ReaderStream> f)
 {
-	if (true/*f.size == ReaderStream::bad_cache*/) {
-		f.getRead().seekg(0, std::ios::end);
-		const auto size = f.getRead().tellg();
-		f.getRead().seekg(0, std::ios::beg);
-		if (size % record_size) throw std::runtime_error("Corrupted file!");
-		return size / record_size;
+	if (f->size == ReaderStream::bad_cache) {
+		auto sz = streamSize(f->getRead());
+		if (sz % record_size) throw std::runtime_error("Corrupted file!");
+		f->size = sz / record_size;
 	}
-//	return f.size;
+	return f->size;
 
 }
 /// @return an index (from 0 to the amount of records in the file) of the timestamp or where it would be
-auto indexOf(ReaderStream& f, const Timestamp& t)
+/// Requires there is at least 1 record
+auto indexOf(std::shared_ptr<ReaderStream> f, const Timestamp& t)
 {
 	const auto records = recordCount(f);
 	std::remove_cv_t<decltype(records)> lo = 0;
 	auto hi = records - 1;
-	while (lo < hi)
+	while (lo <= hi)
 	{
-		const auto mid = (hi + lo) / 2;
+		const auto mid = (hi - lo) / 2 + lo;
 		const auto time = recordAt(f, mid).t;
 		if (t < time)
 			hi = mid - 1;
@@ -105,7 +104,7 @@ auto indexOf(ReaderStream& f, const Timestamp& t)
 		else
 			return mid;
 	}
-	return hi;
+	return std::max(std::min(lo, hi), 0ll);
 }
 std::vector<Session> recordListToSessionList(const std::vector<Record>& r)
 {
@@ -123,34 +122,43 @@ std::vector<Session> recordListToSessionList(const std::vector<Record>& r)
 	}
 	return sessions;
 }
+void assertRecordsAreLogical(std::shared_ptr<ReaderStream> rd) {
+	auto end = recordCount(rd);
+	auto first = recordAt(rd, 0);
+	for (auto i = 1ll; i < end; ++i)
+	{
+		const auto cur = recordAt(rd, i);
+		if (cur.t < first.t) throw std::runtime_error("Bad timing");
+		else if (cur.recordType == first.recordType) throw std::runtime_error("Bad records");
+		first = cur;
+	}
+}
 
-std::vector<Session> StreamLogger::timeSpentSince(const Timestamp& start, const char* task) const
+std::vector<Session> StreamLogger::timeSpentBetween(const Timestamp& start, const Timestamp& end, 
+	const char* task) const
 {
-	auto& str = streams->getStream(task);
-	if (str.getRead().good()) {
+	auto str = streams->getStream(task);
+	auto& in = str->getRead();
+	if (!in.bad()) {
 		const auto endIndex = [&]() { //inclusive
-			auto endIndex = indexOf(str, now());
-			if (recordAt(str, endIndex).recordType == RecordType::start && endIndex < recordCount(str) - 1)
-				++endIndex;
-			printf("End Index: %lld Size: %lld\n", endIndex, recordCount(str));
+			auto endIndex = indexOf(str, end);
+			if (recordAt(str, endIndex).t > end)
+				--endIndex;
 			return endIndex;
 		}();
 		const auto startIndex = [&]() { //inclusive
-			printf("Start: %llu First: %llu\n", start.time_since_epoch().count(),
-				recordAt(str, 0).t.time_since_epoch().count());
 			auto s = indexOf(str, start);
-//			while (s > recordCount(str)) s = indexOf(str, start);
-			if (recordAt(str, s).recordType == RecordType::end && s > 0)
-				--s;
-			printf("Start Index: %lld Size: %lld\n", s, recordCount(str));
+			if (recordAt(str, s).t < start && s < recordCount(str) - 1)
+				++s;
 			return s;
 
 		}();
+		if (endIndex <= 0) return {};
+//		assertRecordsAreLogical(str);
 		std::vector<Record> records(endIndex + 1 - startIndex);
-		str.getRead().seekg(indexToAbsolutePosition(startIndex));
-		str.getRead().read(reinterpret_cast<char*>(&records[0]), (indexToAbsolutePosition(endIndex) + record_size) -
-			indexToAbsolutePosition(startIndex));
-		printf("%llu\n", records.size());
+		in.seekg(indexToAbsolutePosition(startIndex));
+		in.read(reinterpret_cast<char*>(&records[0]), 
+			indexToAbsolutePosition(endIndex) + record_size - indexToAbsolutePosition(startIndex));
 		return recordListToSessionList(records);
 	}
 	throw FnfException(task);
@@ -158,8 +166,8 @@ std::vector<Session> StreamLogger::timeSpentSince(const Timestamp& start, const 
 
 size_t StreamLogger::numLogs(const char* task) const
 {
-	auto& in = streams->getStream(task);
-	if (!in.getRead().good()) throw std::runtime_error("Cannot open file");
+	auto in = streams->getStream(task);
+	if (in->getRead().bad()) throw std::runtime_error("Cannot open file");
 	return recordCount(in);
 }
 
@@ -175,9 +183,9 @@ bool StreamLogger::doesTaskExist(const char* task) const
 
 const Maybe<Session> StreamLogger::sessionAt(const Timestamp& time, const char* task) const
 {
-	auto& str = streams->getStream(task);
-	const auto count = recordCount(str);
-	if (str.getRead().good()) {
+	auto str = streams->getStream(task);	
+	if (!str->getRead().bad()) {
+		const auto count = recordCount(str);
 		const auto index = indexOf(str, time);
 		const auto r = recordAt(str, index);
 		if (r.recordType == RecordType::start && index < count - 1

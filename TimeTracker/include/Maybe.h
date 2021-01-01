@@ -2,6 +2,9 @@
 #include <variant>
 #include <functional>
 namespace maybe {
+	class NoMaybeValue : public std::exception {};
+
+
 	template<typename T>
 	using Maybe = std::variant<T, std::monostate>;
 
@@ -12,15 +15,14 @@ namespace maybe {
 	{
 		if (std::get_if<T>(&m))
 			return *std::get_if<T>(&m);
-		throw std::runtime_error("No maybe value");
-		return std::declval<T>();
+		throw NoMaybeValue();
 	}
 	template<typename T>
 	const T& getOrThrow(const Maybe<T>& m)
 	{
 		if (std::get_if<T>(&m))
 			return *std::get_if<T>(&m);
-		throw std::runtime_error("No maybe value");
+		throw NoMaybeValue();
 	}
 
 	template<typename T>

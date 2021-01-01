@@ -4,16 +4,16 @@
 #include <sstream>
 
 struct MemStreamProvider::impl {
-	std::unordered_map<std::string, StreamMetadata> streams;
+	std::unordered_map<std::string, std::shared_ptr<StreamWrapper>> streams;
 };
 
-StreamMetadata& MemStreamProvider::getStream(const char* name)
+std::shared_ptr<StreamWrapper> MemStreamProvider::getStream(const char* name)
 {
 	if (pimpl->streams.find(name) != pimpl->streams.end()) {
 		return pimpl->streams.at(name);
 	}
 	else {
-		auto p = pimpl->streams.emplace(name, std::make_unique<std::stringstream>()).first;
+		auto p = pimpl->streams.emplace(name, std::make_shared<StreamWrapper>(std::make_unique<std::stringstream>())).first;
 		return (*p).second;
 	}
 }
@@ -26,7 +26,7 @@ bool MemStreamProvider::doesStreamExist(const char* name) const
 void MemStreamProvider::clearStreamData(const char* name)
 {
 	if (doesStreamExist(name))
-		pimpl->streams.at(name) = std::make_unique<std::stringstream>();
+		pimpl->streams.at(name) = std::make_shared<StreamWrapper>(std::make_unique<std::stringstream>());
 }
 
 MemStreamProvider::~MemStreamProvider() = default;

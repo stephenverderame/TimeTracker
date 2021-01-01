@@ -28,7 +28,7 @@ void TaskTracker::pauseTask(const char* task)
 
 Duration TaskTracker::taskElapsed(const char* task, Timestamp start, Timestamp end) const
 {
-	const auto v = pimpl->db->timeSpentSince(start, task);
+	const auto v = pimpl->db->timeSpentBetween(start, end, task);
 	Duration d = Duration::zero();
 	for (auto& ses : v) {
 		if (ses.start < end)

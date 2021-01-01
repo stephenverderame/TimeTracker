@@ -5,9 +5,10 @@ class StreamLogger : public LoggerGateway {
 private:
 	std::shared_ptr<StreamProvider> streams;
 public:
-	void logBegin(const char* task) override;
-	void logEnd(const char* task) override;
-	std::vector<Session> timeSpentSince(const Timestamp& start, const char* task) const override;
+	Timestamp logBegin(const char* task) override;
+	Timestamp logEnd(const char* task) override;
+	std::vector<Session> timeSpentBetween(const Timestamp& start, const Timestamp& end,
+		const char* task) const override;
 
 	///@return the number of log calls (logBegin + logEnd)
 	size_t numLogs(const char * task) const;

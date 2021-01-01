@@ -13,11 +13,13 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GCC")
 endif()
 
 # Add source to this project's executable.
-file(GLOB source_code ${PROJECT_SOURCE_DIR}/TimeTracker/*.cpp)
-file(GLOB_RECURSE source_headers ${PROJECT_SOURCE_DIR}/TimeTracker/*.h)
+file(GLOB source_code ${PROJECT_SOURCE_DIR}/TimeTracker/src/*.cpp)
+file(GLOB_RECURSE source_headers ${PROJECT_SOURCE_DIR}/TimeTracker/include/*.h)
 set(SOURCES ${source_code} ${source_headers})
-add_executable (TimeTracker ${SOURCES} ${PROJECT_SOURCE_DIR}/TimeTracker/Main.cc)
+include_directories(${PROJECT_SOURCE_DIR}/TimeTracker/include)
+add_executable (TimeTracker ${SOURCES} ${PROJECT_SOURCE_DIR}/TimeTracker/Main.cpp)
 
 set(gtest_force_shared_crt TRUE)
 add_subdirectory(gtest)
+
 add_subdirectory(test)
