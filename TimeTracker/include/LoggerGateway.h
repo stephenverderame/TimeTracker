@@ -2,6 +2,7 @@
 #include <vector>
 #include "AppTimes.h"
 #include "Maybe.h"
+#include <string>
 class LoggerGateway {
 public:
 	virtual ~LoggerGateway() = default;
@@ -26,4 +27,12 @@ public:
 	virtual bool doesTaskExist(const char* task) const = 0;
 
 	virtual const maybe::Maybe<Session> sessionAt(const Timestamp& time, const char* task) const = 0;
+
+	virtual std::vector<std::string> listAllTasks() const = 0;
 };
+
+enum class DBType {
+	local,
+	test
+};
+std::unique_ptr<LoggerGateway> makeDBGateway(DBType db);

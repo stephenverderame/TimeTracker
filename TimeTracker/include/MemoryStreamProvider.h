@@ -9,6 +9,7 @@ public:
 	std::shared_ptr<StreamWrapper> getStream(const char* name) override;
 	bool doesStreamExist(const char* name) const override;
 	void clearStreamData(const char* name) override;
+	std::vector<std::string> getAllStreamNames() const override;
 	~MemStreamProvider();
 	MemStreamProvider();
 };

@@ -7,10 +7,11 @@ class TaskTracker : public TimeTracker {
 public:
 	TaskTracker(std::unique_ptr<class LoggerGateway>&& database);
 	~TaskTracker();
-	void startTask(const char* task) override;
-	void pauseTask(const char* task) override;
-	Duration taskElapsed(const char* task, Timestamp start, Timestamp end) const override;
-
+	Timestamp startTask(const char* task) override;
+	Timestamp pauseTask(const char* task) override;
+	std::vector<Session> sessionsBetween(const char* task, Timestamp start, Timestamp end) const override;
+	std::vector<std::string> listTasks() const override;
+	void delTask(const char* task) override;
 	TaskTracker(const TaskTracker&) = delete;
 	TaskTracker& operator=(const TaskTracker&) = delete;
 

@@ -3,13 +3,13 @@
 #include "FileStreamProvider.h"
 #include <istream>
 #include <vector>
-std::shared_ptr<StreamProvider> makeStreamProvider(StreamType type)
+std::shared_ptr<StreamProvider> makeStreamProvider(StreamType type, const char* streamTopic)
 {
 	switch (type) {
 	case StreamType::memory:
 		return std::make_shared<MemStreamProvider>();
 	case StreamType::file:
-		return std::make_shared<FileStreamProvider>();
+		return std::make_shared<FileStreamProvider>(streamTopic);
 	default:
 		throw std::runtime_error("Unknown stream type");
 	}

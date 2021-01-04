@@ -29,6 +29,15 @@ void MemStreamProvider::clearStreamData(const char* name)
 		pimpl->streams.at(name) = std::make_shared<StreamWrapper>(std::make_unique<std::stringstream>());
 }
 
+std::vector<std::string> MemStreamProvider::getAllStreamNames() const
+{
+	std::vector<std::string> s;
+	for (const auto& e : pimpl->streams) {
+		s.push_back(e.first);
+	}
+	return s;
+}
+
 MemStreamProvider::~MemStreamProvider() = default;
 
 MemStreamProvider::MemStreamProvider() : pimpl(std::make_unique<impl>()) {};

@@ -16,25 +16,27 @@ TaskTracker::TaskTracker(std::unique_ptr<LoggerGateway>&& database) :
 
 TaskTracker::~TaskTracker() = default;
 
-void TaskTracker::startTask(const char* task)
+Timestamp TaskTracker::startTask(const char* task)
 {
-	pimpl->db->logBegin(task);
+	return pimpl->db->logBegin(task);
 }
 
-void TaskTracker::pauseTask(const char* task)
+Timestamp TaskTracker::pauseTask(const char* task)
 {
-	pimpl->db->logEnd(task);
+	return pimpl->db->logEnd(task);
 }
 
-Duration TaskTracker::taskElapsed(const char* task, Timestamp start, Timestamp end) const
+std::vector<Session> TaskTracker::sessionsBetween(const char* task, Timestamp start, Timestamp end) const
 {
-	const auto v = pimpl->db->timeSpentBetween(start, end, task);
-	Duration d = Duration::zero();
-	for (auto& ses : v) {
-		if (ses.start < end)
-			d += ses.duration;
-		else
-			break;
-	}
-	return d;
+	return pimpl->db->timeSpentBetween(start, end, task);
+}
+
+std::vector<std::string> TaskTracker::listTasks() const
+{
+	return pimpl->db->listAllTasks();
+}
+
+void TaskTracker::delTask(const char* task)
+{
+	pimpl->db->clearTask(task);
 }

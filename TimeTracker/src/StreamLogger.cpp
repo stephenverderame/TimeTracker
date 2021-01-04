@@ -106,13 +106,31 @@ auto indexOf(std::shared_ptr<ReaderStream> f, const Timestamp& t)
 	}
 	return std::max(std::min(lo, hi), 0ll);
 }
-std::vector<Session> recordListToSessionList(const std::vector<Record>& r)
+/**
+ * Gets a list of sessions from a list of records
+ * If any records are cut off by the start/end time, they are turned into a session of the duration that 
+ * is within the start and end times
+ * @param r stream records to be converted to sessions
+ * @param startTime the startTime of the records, if the first record is an end record, uses the startTime to construct a complete session
+ * @param endTime the endTime of the records, if the last record is a start record, uses this to construct a complete session
+ */
+std::vector<Session> recordListToSessionList(const std::vector<Record>& r, const Timestamp& startTime, 
+	const Timestamp& endTime)
 {
 	std::vector<Session> sessions;
 	const Timestamp * start = nullptr;
-	for (const auto& record : r)
+	for (size_t i = 0; i < r.size(); ++i)
 	{
-		if (start == nullptr && record.recordType == RecordType::start) {
+		const auto& record = r[i];
+		if (i == 0 && record.recordType == RecordType::end && 
+			record.t > startTime) {
+			sessions.emplace_back(startTime, record.t - startTime);
+		}
+		else if (i == r.size() - 1 && record.recordType == RecordType::start
+			&& record.t < endTime) {
+			sessions.emplace_back(record.t, endTime - record.t);
+		}
+		else if (start == nullptr && record.recordType == RecordType::start) {
 			start = &record.t;
 		}
 		else if (start != nullptr && record.recordType == RecordType::end) {
@@ -159,7 +177,7 @@ std::vector<Session> StreamLogger::timeSpentBetween(const Timestamp& start, cons
 		in.seekg(indexToAbsolutePosition(startIndex));
 		in.read(reinterpret_cast<char*>(&records[0]), 
 			indexToAbsolutePosition(endIndex) + record_size - indexToAbsolutePosition(startIndex));
-		return recordListToSessionList(records);
+		return recordListToSessionList(records, start, end);
 	}
 	throw FnfException(task);
 }
@@ -201,4 +219,9 @@ const Maybe<Session> StreamLogger::sessionAt(const Timestamp& time, const char* 
 		}
 	}
 	return Empty();
+}
+
+std::vector<std::string> StreamLogger::listAllTasks() const
+{
+	return streams->getAllStreamNames();
 }

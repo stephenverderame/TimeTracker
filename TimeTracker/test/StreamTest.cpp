@@ -24,7 +24,7 @@ std::vector<Session> initializeData(const char * task, std::unique_ptr<StreamLog
 	std::vector<Session> sessions;
 	Session activeSession;
 	size_t recordCount = 0;
-	for (size_t i = 0; i < amountOfRecords; ++i)
+	for (size_t i = 0; i < amountOfRecords || (start && i >= amountOfRecords); ++i) //prevent incomplete records
 	{
 		if (rand() % 2) {
 			const auto cur = logger->logBegin(task);
@@ -129,14 +129,32 @@ TEST(StreamTest, sessionCount2)
 		}
 	}
 }
+TEST(StreamTest, existingStreams)
+{
+	char badChars[] = { ' ', '|', '$', '\\', '/', '"', '%' };
+	for (int i = 0; i < testCount / 10; ++i)
+	{
+		std::vector<std::string> names;
+		for (int j = 0; j < testCount / 100; ++j)
+		{
+			names.emplace_back(std::to_string(rand()) + badChars[j % sizeof(badChars)]);
+			fl->logBegin(names.back().c_str());
+		}
+		const auto tks = fl->listAllTasks();
+		for (auto& name : names) {
+			ASSERT_NE(std::find(tks.begin(), tks.end(), name), tks.end());
+			fl->clearTask(name.c_str());
+		}
+	}
+}
 int main(int argc, char ** argv)
 {
-	fl = std::make_unique<StreamLogger>(makeStreamProvider(StreamType::memory));
+	fl = std::make_unique<StreamLogger>(makeStreamProvider(StreamType::memory, "tests"));
 	testing::InitGoogleTest(&argc, argv);
 	const int first = RUN_ALL_TESTS();
 	//File system logic is very similar, run tests again but not as thoroughly bc they're slower 
 	//and most logic is repeated
-	fl = std::make_unique<StreamLogger>(makeStreamProvider(StreamType::file));
+	fl = std::make_unique<StreamLogger>(makeStreamProvider(StreamType::file, "tests"));
 	testCount = 300;
 	return RUN_ALL_TESTS() | first;
 }

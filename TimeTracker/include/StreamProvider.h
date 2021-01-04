@@ -2,18 +2,23 @@
 #include <istream>
 #include <memory>
 #include <vector>
+#include <string>
 class StreamProvider {
 public:
 	virtual std::shared_ptr<class StreamWrapper> getStream(const char* name) = 0;
 	virtual bool doesStreamExist(const char* name) const = 0;
 	virtual void clearStreamData(const char* name) = 0;
+	virtual std::vector<std::string> getAllStreamNames() const = 0;
 	virtual ~StreamProvider() = default;
 };
 enum class StreamType {
 	memory, file
 };
-
-std::shared_ptr<StreamProvider> makeStreamProvider(StreamType type);
+/**
+ * Makes a stream provider of the designated type
+ * @param streamTopic the root name of all provided streams
+ */
+std::shared_ptr<StreamProvider> makeStreamProvider(StreamType type, const char * streamTopic);
 
 class ReaderStream {
 public:
@@ -22,6 +27,8 @@ public:
 	long long size = bad_cache;
 public:
 	virtual std::istream& getRead() = 0;
+protected:
+	void inline invalidateCache() { size = bad_cache; }
 };
 
 class WriterStream {
@@ -35,7 +42,7 @@ private:
 public:
 	std::istream& getRead() override { return *stream; }
 	std::ostream& getWrite() override { 
-		size = bad_cache;
+		invalidateCache();
 		return *stream; 
 	}
 	StreamWrapper(std::unique_ptr<std::iostream>&& str) : stream(std::move(str)) {};

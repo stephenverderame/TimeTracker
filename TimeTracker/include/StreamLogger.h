@@ -18,5 +18,7 @@ public:
 
 	const maybe::Maybe<Session> sessionAt(const Timestamp& time, const char* task) const override;
 
+	std::vector<std::string> listAllTasks() const override;
+
 	StreamLogger(std::shared_ptr<StreamProvider>&& provider) : streams(provider) {}
 };
