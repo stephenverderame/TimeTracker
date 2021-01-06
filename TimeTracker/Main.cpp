@@ -3,8 +3,9 @@
 #include <iostream>
 #include <TimeTracker.h>
 
-using days = std::chrono::duration<int, std::ratio<86400, 1>>;
 std::ostream& displayHelp(std::ostream& s);
+/// @return true if the yes option was selected, otherwise false
+bool yesNoConfirmation(std::string&& msg);
 int main(int argc, char ** argv)
 {
 	auto tracker = getTracker(TrackerType::live);
@@ -43,10 +44,9 @@ int main(int argc, char ** argv)
 			readTimestamp(argv[4], enFmt.c_str()));
 		std::cout << printDuration(dur) << "\n";
 	}
-	else if (argc == 3 && !strcmp(argv[1], "del")) {
-		std::cout << "Are you sure you want to delete all information about " << argv[2] << "? (Y/n)\n";
-		auto c = getchar();
-		if (c == tolower('y')) {
+	else if (argc == 3 && !strcmp(argv[1], "del")) {		
+		if (yesNoConfirmation("Are you sure you want to delete all information about " 
+			+ std::string(argv[2]) + "?")) {
 			std::cout << "Deleted " << argv[2] << "\n";
 			tracker->delTask(argv[2]);
 		}
@@ -72,5 +72,11 @@ std::ostream& displayHelp(std::ostream& s)
 	s << "dur_per_day [name] [start] [end] - time spent from start to end each day\n";
 	s << "del [name] - delete a task\n";
 	return s;
+}
+
+bool yesNoConfirmation(std::string&& msg)
+{
+	std::cout << msg << " (Y/n)\n";
+	return tolower(getchar()) == 'y';
 }
 

@@ -128,7 +128,7 @@ std::vector<Session> recordListToSessionList(const std::vector<Record>& r, const
 		}
 		else if (i == r.size() - 1 && record.recordType == RecordType::start
 			&& record.t < endTime) {
-			sessions.emplace_back(record.t, endTime - record.t);
+			sessions.emplace_back(record.t, std::min(endTime, now()) - record.t);
 		}
 		else if (start == nullptr && record.recordType == RecordType::start) {
 			start = &record.t;

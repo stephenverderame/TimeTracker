@@ -108,6 +108,7 @@ TEST(ParserTest, dateMatch)
 		tm2 << " (" << std::chrono::floor<days>(rdTime).time_since_epoch().count() << ") ";
 		msg.updateMsg(printTimestamp(time, fmt) + tm1.str() + " but read " + printTimestamp(rdTime, fmt) + tm2.str());
 		ASSERT_EQ(printTimestamp(rdTime, fmt), printTimestamp(time, fmt));
+//		ASSERT_EQ(std::chrono::time_point_cast<days>(rdTime), std::chrono::time_point_cast<days>(time));
 	}
 }
 int main(int argc, char** argv)

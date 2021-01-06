@@ -52,6 +52,19 @@ std::string printTimestamp(Timestamp t, const char * fmt)
 	return ss.str();
 
 }
+/// @return localTime - utcTime
+Duration localOffsetFromUTC()
+{
+	auto utc = now();
+	auto utcTime = Timestamp::clock::to_time_t(
+		std::chrono::time_point_cast<Timestamp::clock::duration>(utc)
+	);
+	auto localTm = localtime(&utcTime);
+	localTm->tm_isdst = -1;
+	auto localTime = mktime(localTm);
+	auto local = Timestamp::clock::from_time_t(localTime);
+	return local - utc;
+}
 
 Timestamp readTimestamp(const std::string& s, const char * fmt)
 {
@@ -62,7 +75,7 @@ Timestamp readTimestamp(const std::string& s, const char * fmt)
 	tm.tm_isdst = -1; //let mktime figure out daylight savings
 	auto localTime = mktime(&tm);
 //	std::cout << std::put_time(&utcStruct, fmt) << " UTC \n";*/
-	return Timestamp::clock::from_time_t(localTime);
+	return Timestamp::clock::from_time_t(localTime) - localOffsetFromUTC();
 
 }
 /// @return true if the character is a date delimiter (' ', '/', or ':')

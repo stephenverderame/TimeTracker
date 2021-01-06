@@ -4,6 +4,7 @@
 #include "StreamProvider.h"
 #include <algorithm>
 #include <numeric>
+#include <regex>
 
 std::unique_ptr<TimeTracker> getTracker(TrackerType t)
 {
@@ -29,6 +30,19 @@ Duration chunkOfSession(const Session& session, const Timestamp& periodStart, co
 		std::max(periodStart, session.start);
 	else
 		return std::chrono::nanoseconds(0);
+}
+
+std::vector<std::string> tasksMatching(const TimeTracker& tracker, const char* taskRegex)
+{
+	std::regex r(taskRegex);
+	const auto v = tracker.listTasks();
+	std::vector<std::string> matchingTasks;
+	std::for_each(v.begin(), v.end(), [&](auto& e) {
+		if (std::regex_match(e, r)) {
+			matchingTasks.push_back(e);
+		}
+	});
+	return matchingTasks;
 }
 
 std::vector<std::pair<Timestamp, Duration>> timeEachPeriod(const TimeTracker& tracker, const char* task, Timestamp start, Timestamp end, Duration period)

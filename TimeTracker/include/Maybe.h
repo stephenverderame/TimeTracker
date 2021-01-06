@@ -13,15 +13,15 @@ namespace maybe {
 	template<typename T>
 	T& getOrThrow(Maybe<T>& m)
 	{
-		if (std::get_if<T>(&m))
-			return *std::get_if<T>(&m);
+		if (auto val = std::get_if<T>(&m))
+			return *val;
 		throw NoMaybeValue();
 	}
 	template<typename T>
 	const T& getOrThrow(const Maybe<T>& m)
 	{
-		if (std::get_if<T>(&m))
-			return *std::get_if<T>(&m);
+		if (const auto val = std::get_if<T>(&m))
+			return *val;
 		throw NoMaybeValue();
 	}
 
@@ -34,6 +34,7 @@ namespace maybe {
 	template<typename T>
 	void doIfPresent(Maybe<T>& m, std::function<void(T&)> f)
 	{
-		if (isPresent(m)) f(getOrThrow(m));
+		if (auto v = std::get_if<T>(&m))
+			f(*v);
 	}
 }
